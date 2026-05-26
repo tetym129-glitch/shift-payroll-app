@@ -1,0 +1,166 @@
+// 給料計算ロジック
+
+export interface WorkRecord {
+  date: string       // YYYY-MM-DD
+  clockIn: string    // HH:MM
+  clockOut: string   // HH:MM
+  breakStart: string // HH:MM (出 = 休憩開始)
+  breakEnd: string   // HH:MM (戻り = 休憩終了)
+}
+
+export interface SalaryResult {
+  workDays: number
+  workMinutes: number
+  workHoursLabel: string
+  baseWage: number
+  holidayBonus: number
+  transportFee: number
+  totalIncome: number
+  incomeTax: number
+  employmentInsurance: number
+  netPay: number
+}
+
+// 時給テーブル
+// 平日: 全員 1,053円（福井市最低賃金）
+// 土日祝: 通常 1,200円 / 研修中（小川・山下・本田）1,150円
+const HOURLY_RATES: Record<string, { weekday: number; holiday: number }> = {
+  '坂井': { weekday: 1153, holiday: 1300 },   // 特別レート
+  '小川': { weekday: 1053, holiday: 1150 },   // 研修中
+  '山下': { weekday: 1053, holiday: 1150 },   // 研修中
+  '本田': { weekday: 1053, holiday: 1150 },   // 研修中
+}
+const DEFAULT_RATE = { weekday: 1053, holiday: 1200 }
+
+export function getHourlyRate(name: string) {
+  return HOURLY_RATES[name] ?? DEFAULT_RATE
+}
+
+// 土日祝判定（祝日は簡易判定: 土=6, 日=0）
+export function isHoliday(dateStr: string): boolean {
+  const d = new Date(dateStr + 'T00:00:00')
+  const day = d.getDay()
+  return day === 0 || day === 6
+}
+
+// 分を30分単位に切り上げ（出勤打刻用）
+function roundUpToHalf(minutes: number): number {
+  if (minutes % 30 === 0) return minutes
+  return Math.ceil(minutes / 30) * 30
+}
+
+// 分を30分単位に切り捨て（退勤打刻用）
+function roundDownToHalf(minutes: number): number {
+  return Math.floor(minutes / 30) * 30
+}
+
+// "HH:MM" -> 分（0時からの分数）
+function toMinutes(timeStr: string): number {
+  if (!timeStr) return -1
+  const [h, m] = timeStr.split(':').map(Number)
+  return h * 60 + m
+}
+
+// 1レコードの実労働時間（分）と土日祝フラグを返す
+export function calcWorkMinutes(record: WorkRecord): { workMin: number; isWeekend: boolean } {
+  const clockIn = toMinutes(record.clockIn)
+  const clockOut = toMinutes(record.clockOut)
+  if (clockIn < 0 || clockOut < 0) return { workMin: 0, isWeekend: false }
+
+  // 出勤: 30分単位切り上げ
+  const roundedIn = roundUpToHalf(clockIn)
+  // 退勤: 30分単位切り捨て
+  const roundedOut = roundDownToHalf(clockOut)
+
+  let workMin = roundedOut - roundedIn
+  if (workMin <= 0) return { workMin: 0, isWeekend: isHoliday(record.date) }
+
+  // 休憩時間
+  const bStart = toMinutes(record.breakStart)
+  const bEnd = toMinutes(record.breakEnd)
+  if (bStart >= 0 && bEnd >= 0 && bEnd > bStart) {
+    workMin -= (bEnd - bStart)
+  }
+
+  if (workMin < 0) workMin = 0
+
+  return { workMin, isWeekend: isHoliday(record.date) }
+}
+
+// 給料全体の計算
+export function calcSalary(
+  name: string,
+  records: WorkRecord[],
+  transportFee: number
+): SalaryResult {
+  const rate = getHourlyRate(name)
+
+  let weekdayMin = 0
+  let weekendMin = 0
+  let workDays = 0
+
+  for (const record of records) {
+    const { workMin, isWeekend } = calcWorkMinutes(record)
+    if (workMin > 0) {
+      workDays++
+      if (isWeekend) weekendMin += workMin
+      else weekdayMin += workMin
+    }
+  }
+
+  // 基本給: 平日時間×平日時給 ＋ 土日祝時間×土日祝時給
+  const baseWage = Math.floor((weekdayMin / 60) * rate.weekday + (weekendMin / 60) * rate.holiday)
+
+  // 土日祝手当なし（時給に含む）
+  const holidayBonus = 0
+
+  const totalIncome = baseWage + holidayBonus + transportFee
+
+  // 所得税（乙欄簡易: 3.063%切り捨て）
+  const incomeTax = Math.floor(totalIncome * 0.03063)
+
+  // 雇用保険: 坂井のみ 支給合計×0.6%切り捨て
+  const employmentInsurance = name === '坂井' ? Math.floor(totalIncome * 0.006) : 0
+
+  const netPay = totalIncome - incomeTax - employmentInsurance
+
+  const totalWorkMin = weekdayMin + weekendMin
+  const hours = Math.floor(totalWorkMin / 60)
+  const mins = totalWorkMin % 60
+  const workHoursLabel = `${hours}時間${String(mins).padStart(2, '0')}分`
+
+  return {
+    workDays,
+    workMinutes: totalWorkMin,
+    workHoursLabel,
+    baseWage,
+    holidayBonus,
+    transportFee,
+    totalIncome,
+    incomeTax,
+    employmentInsurance,
+    netPay,
+  }
+}
+
+// JSON出力用フォーマット
+export interface StaffSalaryJson {
+  name: string
+  workDays: number
+  workHours: string
+  workMinutes: number
+  baseWage: number
+  holidayBonus: number
+  transportFee: number
+  totalIncome: number
+  incomeTax: number
+  employmentInsurance: number
+  netPay: number
+  records: WorkRecord[]
+}
+
+export interface SalaryExportJson {
+  period: string
+  createdAt: string
+  staff: StaffSalaryJson[]
+}
