@@ -11,18 +11,25 @@ interface StaffData {
 
 const DAYS_JA = ['日', '月', '火', '水', '木', '金', '土']
 
-function getPeriodDates(): { dateStr: string; label: string }[] {
-  const today = new Date()
-  const y = today.getFullYear()
-  const m = today.getMonth() + 1
-  const endMonth = m
-  const endYear = y
-  const startMonth = m - 1 <= 0 ? 12 : m - 1
-  const startYear = m - 1 <= 0 ? y - 1 : y
+function getPeriodDates(startDate?: Date, endDate?: Date): { dateStr: string; label: string }[] {
+  let start = startDate
+  let end = endDate
+
+  if (!start || !end) {
+    const today = new Date()
+    const y = today.getFullYear()
+    const m = today.getMonth() + 1
+    const endMonth = m
+    const endYear = y
+    const startMonth = m - 1 <= 0 ? 12 : m - 1
+    const startYear = m - 1 <= 0 ? y - 1 : y
+
+    start = new Date(startYear, startMonth - 1, 21)
+    end = new Date(endYear, endMonth - 1, 20)
+  }
 
   const dates: { dateStr: string; label: string }[] = []
-  let d = new Date(startYear, startMonth - 1, 21)
-  const end = new Date(endYear, endMonth - 1, 20)
+  let d = new Date(start)
   while (d <= end) {
     const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
     const label = `${d.getMonth() + 1}/${d.getDate()}(${DAYS_JA[d.getDay()]})`
@@ -32,10 +39,9 @@ function getPeriodDates(): { dateStr: string; label: string }[] {
   return dates
 }
 
-const PERIOD_DATES = getPeriodDates()
-
-function initRecords(): WorkRecord[] {
-  return PERIOD_DATES.map(({ dateStr }) => ({
+function initRecords(periodDates?: { dateStr: string; label: string }[]): WorkRecord[] {
+  const dates = periodDates || getPeriodDates()
+  return dates.map(({ dateStr }) => ({
     date: dateStr,
     clockIn: '',
     clockOut: '',
@@ -48,6 +54,25 @@ export default function AdminPage() {
   const [staff, setStaff] = useState<StaffMember[]>([])
   const [selectedStaff, setSelectedStaff] = useState<string>('')
   const [staffData, setStaffData] = useState<Record<string, StaffData>>({})
+  const [startDate, setStartDate] = useState<string>('')
+  const [endDate, setEndDate] = useState<string>('')
+
+  useEffect(() => {
+    // デフォルト日付を計算（前月21日～当月20日）
+    const today = new Date()
+    const y = today.getFullYear()
+    const m = today.getMonth() + 1
+    const endMonth = m
+    const endYear = y
+    const startMonth = m - 1 <= 0 ? 12 : m - 1
+    const startYear = m - 1 <= 0 ? y - 1 : y
+
+    const defaultStart = new Date(startYear, startMonth - 1, 21)
+    const defaultEnd = new Date(endYear, endMonth - 1, 20)
+
+    setStartDate(defaultStart.toISOString().split('T')[0])
+    setEndDate(defaultEnd.toISOString().split('T')[0])
+  }, [])
 
   useEffect(() => {
     fetch('/api/staff')
@@ -62,20 +87,21 @@ export default function AdminPage() {
         setStaffData(initial)
       })
       .catch((err) => console.error('Failed to fetch staff:', err))
-  }, [])
+  }, [startDate, endDate])
 
-  const currentData = staffData[selectedStaff] ?? { records: initRecords(), transportFee: 0 }
+  const periodDates = startDate && endDate ? getPeriodDates(new Date(startDate), new Date(endDate)) : []
+  const currentData = staffData[selectedStaff] ?? { records: initRecords(periodDates), transportFee: 0 }
 
   const updateRecord = useCallback(
     (idx: number, field: keyof WorkRecord, value: string) => {
       setStaffData((prev) => {
-        const data = prev[selectedStaff] ?? { records: initRecords(), transportFee: 0 }
+        const data = prev[selectedStaff] ?? { records: initRecords(periodDates), transportFee: 0 }
         const records = [...data.records]
         records[idx] = { ...records[idx], [field]: value }
         return { ...prev, [selectedStaff]: { ...data, records } }
       })
     },
-    [selectedStaff]
+    [selectedStaff, periodDates]
   )
 
   const updateTransport = useCallback(
@@ -132,15 +158,42 @@ export default function AdminPage() {
     URL.revokeObjectURL(url)
   }
 
-  const periodStr = PERIOD_DATES.length > 0
-    ? `${PERIOD_DATES[0].label.split('(')[0]} ～ ${PERIOD_DATES[PERIOD_DATES.length - 1].label.split('(')[0]}`
-    : '期間不明'
+  const periodStr = periodDates.length > 0
+    ? `${periodDates[0].label.split('(')[0]} ～ ${periodDates[periodDates.length - 1].label.split('(')[0]}`
+    : '期間を選択してください'
 
   return (
     <div className="min-h-screen bg-gray-50 p-6">
       <div className="max-w-6xl mx-auto">
         <h1 className="text-3xl font-bold mb-2">給料計算</h1>
         <p className="text-gray-600 mb-6">{periodStr}</p>
+
+        {/* Period Date Selector */}
+        <div className="bg-white rounded-lg shadow-md p-4 mb-6">
+          <label className="block text-sm font-semibold mb-3">計算期間を選択</label>
+          <div className="flex gap-4 items-center">
+            <div className="flex items-center gap-2">
+              <label htmlFor="startDate" className="text-sm font-medium">開始日：</label>
+              <input
+                id="startDate"
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                className="px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <label htmlFor="endDate" className="text-sm font-medium">終了日：</label>
+              <input
+                id="endDate"
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                className="px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+          </div>
+        </div>
 
         {/* Staff Tabs */}
         <div className="bg-white rounded-lg shadow-md p-4 mb-6">
@@ -178,7 +231,7 @@ export default function AdminPage() {
                 {currentData.records.map((record, idx) => (
                   <tr key={record.date} className="border-b hover:bg-gray-50">
                     <td className="px-4 py-2">
-                      <span>{PERIOD_DATES[idx]?.label || ''}</span>
+                      <span>{periodDates[idx]?.label || ''}</span>
                       {isHoliday(record.date) && <span className="text-red-500 ml-1 font-semibold">祝</span>}
                     </td>
                     <td className="px-4 py-2">
