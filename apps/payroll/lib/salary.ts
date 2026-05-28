@@ -23,12 +23,14 @@ export interface SalaryResult {
 
 // 時給テーブル
 // 平日: 全員 1,053円（福井市最低賃金）
-// 土日祝: 通常 1,200円 / 研修中（小川・山下・本田）1,150円
+// 土日祝: 通常 1,200円 / 研修中（小川・山下・本田・石川・山本）1,150円
 const HOURLY_RATES: Record<string, { weekday: number; holiday: number }> = {
-  '坂井': { weekday: 1153, holiday: 1300 },   // 特別レート
-  '小川': { weekday: 1053, holiday: 1150 },   // 研修中
-  '山下': { weekday: 1053, holiday: 1150 },   // 研修中
-  '本田': { weekday: 1053, holiday: 1150 },   // 研修中
+  '坂井': { weekday: 1153, holiday: 1300 },     // 特別レート
+  '小川': { weekday: 1053, holiday: 1150 },     // 研修中
+  '山下': { weekday: 1053, holiday: 1150 },     // 研修中
+  '本田': { weekday: 1053, holiday: 1150 },     // 研修中
+  '石川': { weekday: 1053, holiday: 1150 },     // 研修中
+  '山本': { weekday: 1053, holiday: 1150 },     // 研修中
 }
 const DEFAULT_RATE = { weekday: 1053, holiday: 1200 }
 
@@ -36,11 +38,45 @@ export function getHourlyRate(name: string) {
   return HOURLY_RATES[name] ?? DEFAULT_RATE
 }
 
-// 土日祝判定（祝日は簡易判定: 土=6, 日=0）
+// 日本の国民の祝日を判定
+function isNationalHoliday(dateStr: string): boolean {
+  const [year, month, date] = dateStr.split('-').map(Number)
+  const dateKey = `${String(month).padStart(2, '0')}-${String(date).padStart(2, '0')}`
+
+  // 2026年の国民の祝日（主要なもの）
+  const holidays: Record<number, string[]> = {
+    2026: [
+      '01-01', // 元日
+      '01-12', // 成人の日（第2月曜日）
+      '02-11', // 建国記念の日
+      '02-23', // 天皇誕生日
+      '03-21', // 春分の日
+      '04-29', // 昭和の日
+      '05-03', // 憲法記念日
+      '05-04', // みどりの日
+      '05-05', // こどもの日
+      '07-20', // 海の日（第3月曜日）
+      '08-10', // 山の日
+      '09-21', // 敬老の日（第3月曜日）
+      '09-22', // 秋分の日
+      '10-12', // スポーツの日（第2月曜日）
+      '11-03', // 文化の日
+      '11-23', // 勤労感謝の日
+    ],
+  }
+
+  return holidays[year]?.includes(dateKey) || false
+}
+
+// 土日祝判定
 export function isHoliday(dateStr: string): boolean {
   const d = new Date(dateStr + 'T00:00:00')
   const day = d.getDay()
-  return day === 0 || day === 6
+  const isSunday = day === 0
+  const isSaturday = day === 6
+  const isNational = isNationalHoliday(dateStr)
+
+  return isSunday || isSaturday || isNational
 }
 
 // 分を30分単位に切り上げ（出勤打刻用）

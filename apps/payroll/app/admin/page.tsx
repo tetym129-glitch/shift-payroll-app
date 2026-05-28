@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import type { StaffMember, WorkRecord } from '@/lib/types'
-import { calcSalary, type StaffSalaryJson, type SalaryExportJson } from '@/lib/salary'
+import { calcSalary, type StaffSalaryJson, type SalaryExportJson, isHoliday } from '@/lib/salary'
 
 interface StaffData {
   records: WorkRecord[]
@@ -178,7 +178,8 @@ export default function AdminPage() {
                 {currentData.records.map((record, idx) => (
                   <tr key={record.date} className="border-b hover:bg-gray-50">
                     <td className="px-4 py-2">
-                      {PERIOD_DATES[idx]?.label || ''}
+                      <span>{PERIOD_DATES[idx]?.label || ''}</span>
+                      {isHoliday(record.date) && <span className="text-red-500 ml-1 font-semibold">祝</span>}
                     </td>
                     <td className="px-4 py-2">
                       <input
