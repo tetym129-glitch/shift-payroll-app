@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import type { StaffMember, ShiftSubmission, AppSettings } from '@/lib/types'
 
-type Tab = '提出状況' | 'スタッフ管理' | '設定' | 'シフト表' | '給料計算'
+type Tab = '提出状況' | 'スタッフ管理' | '設定' | 'シフト表'
 
 function ShiftSummary({ shifts }: { shifts: Record<string, { type: string | null; time: string }> }) {
   const counts: Record<string, number> = { '昼': 0, '夜': 0, '1日': 0, '×': 0 }
@@ -250,13 +250,11 @@ export default function AdminPage() {
 
       {/* タブ */}
       <div className="flex border-b border-gray-200 bg-white shadow-sm overflow-x-auto">
-        {(['提出状況', 'シフト表', 'スタッフ管理', '設定', '給料計算'] as Tab[]).map(t => (
+        {(['提出状況', 'シフト表', 'スタッフ管理', '設定'] as Tab[]).map(t => (
           <button
             key={t}
             onClick={() => {
-              if (t === '給料計算') {
-                router.push('/admin/salary')
-              } else if (t === 'シフト表') {
+              if (t === 'シフト表') {
                 router.push('/admin/calendar')
               } else {
                 setTab(t)
