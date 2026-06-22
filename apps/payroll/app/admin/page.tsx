@@ -136,10 +136,10 @@ export default function AdminPage() {
       }
     })
 
-    const startYear = PERIOD_DATES[0].dateStr.split('-')[0]
-    const startMonth = PERIOD_DATES[0].dateStr.split('-')[1]
-    const endYear = PERIOD_DATES[PERIOD_DATES.length - 1].dateStr.split('-')[0]
-    const endMonth = PERIOD_DATES[PERIOD_DATES.length - 1].dateStr.split('-')[1]
+    const startYear = periodDates[0].dateStr.split('-')[0]
+    const startMonth = periodDates[0].dateStr.split('-')[1]
+    const endYear = periodDates[periodDates.length - 1].dateStr.split('-')[0]
+    const endMonth = periodDates[periodDates.length - 1].dateStr.split('-')[1]
     const periodStr = `${startYear}-${startMonth}-${endYear}-${endMonth}`
 
     const json: SalaryExportJson = {
