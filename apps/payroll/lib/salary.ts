@@ -73,7 +73,8 @@ function isNationalHoliday(dateStr: string): boolean {
 
 // 土日祝判定
 export function isHoliday(dateStr: string): boolean {
-  const d = new Date(dateStr + 'T00:00:00')
+  const [year, month, date] = dateStr.split('-').map(Number)
+  const d = new Date(year, month - 1, date)
   const day = d.getDay()
   const isSunday = day === 0
   const isSaturday = day === 6
