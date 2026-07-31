@@ -77,17 +77,42 @@ export default function AdminPage() {
   useEffect(() => {
     fetch('/api/staff')
       .then((r) => r.json())
-      .then((list: StaffMember[]) => {
+      .then((data) => {
+        const list = Array.isArray(data) ? data : []
         setStaff(list)
         if (list.length > 0) setSelectedStaff(list[0].name)
         const initial: Record<string, StaffData> = {}
         list.forEach((s) => {
           initial[s.name] = { records: initRecords(), transportFee: 0 }
         })
-        setStaffData(initial)
+        // ローカルストレージから復元を試みる
+        if (typeof window !== 'undefined') {
+          const saved = localStorage.getItem('payrollData')
+          if (saved) {
+            try {
+              setStaffData(JSON.parse(saved))
+            } catch {
+              setStaffData(initial)
+            }
+          } else {
+            setStaffData(initial)
+          }
+        } else {
+          setStaffData(initial)
+        }
       })
-      .catch((err) => console.error('Failed to fetch staff:', err))
-  }, [startDate, endDate])
+      .catch((err) => {
+        console.error('Failed to fetch staff:', err)
+        setStaff([])
+      })
+  }, [])
+
+  // ローカルストレージに自動保存
+  useEffect(() => {
+    if (typeof window !== 'undefined' && Object.keys(staffData).length > 0) {
+      localStorage.setItem('payrollData', JSON.stringify(staffData))
+    }
+  }, [staffData])
 
   const periodDates = startDate && endDate ? getPeriodDates(new Date(startDate), new Date(endDate)) : []
   const currentData = staffData[selectedStaff] ?? { records: initRecords(periodDates), transportFee: 0 }
