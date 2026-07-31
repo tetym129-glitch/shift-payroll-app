@@ -117,6 +117,24 @@ export default function AdminPage() {
   const periodDates = startDate && endDate ? getPeriodDates(new Date(startDate), new Date(endDate)) : []
   const currentData = staffData[selectedStaff] ?? { records: initRecords(periodDates), transportFee: 0 }
 
+  // 期間が変更された場合、既存のレコードをマージ
+  useEffect(() => {
+    if (selectedStaff && staffData[selectedStaff] && periodDates.length > 0) {
+      const existing = staffData[selectedStaff].records
+      if (existing.length !== periodDates.length) {
+        // 既存データを新しい期間に対応する配列に再構築
+        const mergedRecords = periodDates.map(({ dateStr }) => {
+          const existingRecord = existing.find(r => r.date === dateStr)
+          return existingRecord ?? { date: dateStr, clockIn: '', clockOut: '', breakStart: '', breakEnd: '' }
+        })
+        setStaffData(prev => ({
+          ...prev,
+          [selectedStaff]: { ...prev[selectedStaff], records: mergedRecords }
+        }))
+      }
+    }
+  }, [startDate, endDate, selectedStaff, periodDates.length])
+
   const updateRecord = useCallback(
     (idx: number, field: keyof WorkRecord, value: string) => {
       setStaffData((prev) => {
