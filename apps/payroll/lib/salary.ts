@@ -32,7 +32,7 @@ const HOURLY_RATES: Record<string, { weekday: number; holiday: number }> = {
   '本田': { weekday: 1053, holiday: 1150 },     // 研修中
   '石川': { weekday: 1053, holiday: 1150 },     // 研修中
   '山本': { weekday: 1053, holiday: 1150 },     // 研修中
-  '古川': { weekday: 1053, holiday: 1150 },     // 研修中
+  '古川': { weekday: 1053, holiday: 1200 },     // 通常
   '藤森': { weekday: 1053, holiday: 1150 },     // 研修中
 }
 const DEFAULT_RATE = { weekday: 1053, holiday: 1200 }
