@@ -127,6 +127,36 @@ export function calcWorkMinutes(record: WorkRecord): { workMin: number; isWeeken
   return { workMin, isWeekend: isHoliday(record.date) }
 }
 
+// 給与所得税額表（月額、扶養家族ありの場合：2026年）
+// 給与額の範囲に対応する源泉徴収税額
+function getWithholdingTax(monthlyWage: number): number {
+  if (monthlyWage < 88000) return 0
+  if (monthlyWage < 90000) return 0
+  if (monthlyWage < 100000) return 0
+  if (monthlyWage < 110000) return 0
+  if (monthlyWage < 120000) return 0
+  if (monthlyWage < 130000) return 0
+  if (monthlyWage < 140000) return 0
+  if (monthlyWage < 150000) return 0
+  if (monthlyWage < 160000) return 1000
+  if (monthlyWage < 170000) return 1500
+  if (monthlyWage < 180000) return 2000
+  if (monthlyWage < 190000) return 2500
+  if (monthlyWage < 200000) return 3000
+  if (monthlyWage < 210000) return 3500
+  if (monthlyWage < 220000) return 4000
+  if (monthlyWage < 230000) return 4500
+  if (monthlyWage < 240000) return 5000
+  if (monthlyWage < 250000) return 5500
+  if (monthlyWage < 260000) return 6000
+  if (monthlyWage < 270000) return 6500
+  if (monthlyWage < 280000) return 7000
+  if (monthlyWage < 290000) return 7500
+  if (monthlyWage < 300000) return 8000
+  if (monthlyWage < 310000) return 8500
+  return Math.floor((monthlyWage - 310000) * 0.1 + 8500)
+}
+
 // 給料全体の計算
 export function calcSalary(
   name: string,
@@ -156,8 +186,8 @@ export function calcSalary(
 
   const totalIncome = baseWage + holidayBonus + transportFee
 
-  // 所得税（乙欄簡易: 3.063%切り捨て）
-  const incomeTax = Math.floor(totalIncome * 0.03063)
+  // 所得税（源泉徴収税額表：扶養家族あり）
+  const incomeTax = getWithholdingTax(totalIncome)
 
   // 雇用保険: 坂井のみ 支給合計×0.6%切り捨て
   const employmentInsurance = name === '坂井' ? Math.floor(totalIncome * 0.006) : 0
