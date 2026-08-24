@@ -129,57 +129,56 @@ export function calcWorkMinutes(record: WorkRecord): { workMin: number; isWeeken
   return { workMin, isWeekend: isHoliday(record.date) }
 }
 
-// 給与所得税額表（月額、扶養親族1人：令和8年分・国税庁公式）
+// 給与所得税額表（月額、甲0人：令和8年分・国税庁公式）
 // 社会保険料等控除後の給与額に対応する所得税額
 function getWithholdingTax(monthlyWage: number): number {
   if (monthlyWage < 105000) return 0
-  if (monthlyWage < 107000) return 0
-  if (monthlyWage < 109000) return 0
-  if (monthlyWage < 111000) return 0
-  if (monthlyWage < 113000) return 0
-  if (monthlyWage < 115000) return 0
-  if (monthlyWage < 117000) return 0
-  if (monthlyWage < 119000) return 0
-  if (monthlyWage < 121000) return 0
-  if (monthlyWage < 123000) return 0
-  if (monthlyWage < 125000) return 0
-  if (monthlyWage < 127000) return 0
-  if (monthlyWage < 129000) return 0
-  if (monthlyWage < 131000) return 0
-  if (monthlyWage < 133000) return 0
-  if (monthlyWage < 135000) return 0
-  if (monthlyWage < 137000) return 0
-  if (monthlyWage < 139000) return 190
-  if (monthlyWage < 141000) return 300
-  if (monthlyWage < 143000) return 400
-  if (monthlyWage < 145000) return 500
-  if (monthlyWage < 147000) return 600
-  if (monthlyWage < 149000) return 700
-  if (monthlyWage < 151000) return 810
-  if (monthlyWage < 153000) return 910
-  if (monthlyWage < 155000) return 1010
-  if (monthlyWage < 157000) return 1110
-  if (monthlyWage < 159000) return 1210
-  if (monthlyWage < 161000) return 1300
-  if (monthlyWage < 163000) return 1370
-  if (monthlyWage < 165000) return 1440
-  if (monthlyWage < 167000) return 1510
-  if (monthlyWage < 169000) return 1580
-  if (monthlyWage < 171000) return 1650
-  if (monthlyWage < 173000) return 1730
-  if (monthlyWage < 175000) return 1800
-  if (monthlyWage < 177000) return 1870
-  if (monthlyWage < 179000) return 1940
-  if (monthlyWage < 181000) return 2010
-  if (monthlyWage < 183000) return 2080
-  if (monthlyWage < 185000) return 2150
-  if (monthlyWage < 187000) return 2230
-  if (monthlyWage < 189000) return 2300
-  if (monthlyWage < 191000) return 2370
-  if (monthlyWage < 193000) return 2440
-  if (monthlyWage < 195000) return 2510
-  // 195,000円以上の場合は、以降の計算に従う
-  return Math.floor((monthlyWage - 195000) * 0.1 + 2510)
+  if (monthlyWage < 107000) return 170
+  if (monthlyWage < 109000) return 280
+  if (monthlyWage < 111000) return 380
+  if (monthlyWage < 113000) return 480
+  if (monthlyWage < 115000) return 580
+  if (monthlyWage < 117000) return 680
+  if (monthlyWage < 119000) return 790
+  if (monthlyWage < 121000) return 890
+  if (monthlyWage < 123000) return 990
+  if (monthlyWage < 125000) return 1090
+  if (monthlyWage < 127000) return 1190
+  if (monthlyWage < 129000) return 1300
+  if (monthlyWage < 131000) return 1400
+  if (monthlyWage < 133000) return 1500
+  if (monthlyWage < 135000) return 1600
+  if (monthlyWage < 137000) return 1710
+  if (monthlyWage < 139000) return 1810
+  if (monthlyWage < 141000) return 1910
+  if (monthlyWage < 143000) return 2010
+  if (monthlyWage < 145000) return 2110
+  if (monthlyWage < 147000) return 2220
+  if (monthlyWage < 149000) return 2320
+  if (monthlyWage < 151000) return 2430
+  if (monthlyWage < 153000) return 2530
+  if (monthlyWage < 155000) return 2630
+  if (monthlyWage < 157000) return 2730
+  if (monthlyWage < 159000) return 2830
+  if (monthlyWage < 161000) return 2930
+  if (monthlyWage < 163000) return 3030
+  if (monthlyWage < 165000) return 3120
+  if (monthlyWage < 167000) return 3220
+  if (monthlyWage < 169000) return 3320
+  if (monthlyWage < 171000) return 3430
+  if (monthlyWage < 173000) return 3540
+  if (monthlyWage < 175000) return 3650
+  if (monthlyWage < 177000) return 3480
+  if (monthlyWage < 179000) return 3550
+  if (monthlyWage < 181000) return 3620
+  if (monthlyWage < 183000) return 3770
+  if (monthlyWage < 185000) return 3840
+  if (monthlyWage < 187000) return 3910
+  if (monthlyWage < 189000) return 3980
+  if (monthlyWage < 191000) return 4050
+  if (monthlyWage < 193000) return 4120
+  // 193,000円以上の場合は、以降の計算に従う
+  return Math.floor((monthlyWage - 193000) * 0.1 + 4120)
 }
 
 // 給料全体の計算
