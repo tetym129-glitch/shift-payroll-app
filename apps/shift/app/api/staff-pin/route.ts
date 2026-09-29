@@ -1,8 +1,6 @@
 import { NextResponse } from 'next/server'
 import { setStaffPin, removeStaffPin, getStaffPinsStatus } from '@/lib/notion'
 
-export const dynamic = 'force-dynamic'
-
 export async function GET() {
   try {
     return NextResponse.json(await getStaffPinsStatus())
