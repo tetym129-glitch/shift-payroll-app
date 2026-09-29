@@ -26,6 +26,7 @@ export interface SalaryResult {
 // 土日祝: 通常 1,200円 / 研修中（石川・山本・山下・藤森・鈴木）1,150円
 const HOURLY_RATES: Record<string, { weekday: number; holiday: number }> = {
   '坂井': { weekday: 1200, holiday: 1300 },     // 特別レート
+  '山田': { weekday: 1100, holiday: 1300 },
   '中上': { weekday: 1100, holiday: 1200 },     // 通常
   '小川': { weekday: 1100, holiday: 1200 },     // 通常
   '本田': { weekday: 1100, holiday: 1200 },     // 研修外れ
