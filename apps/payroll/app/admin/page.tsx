@@ -10,44 +10,52 @@ interface StaffData {
 }
 
 const DAYS_JA = ['日', '月', '火', '水', '木', '金', '土']
+const STORAGE_KEY = 'payrollData'
+const STORAGE_VERSION_KEY = 'payrollDataVersion'
+const STORAGE_VERSION = '2'
 
-function getPeriodDates(startDate?: Date, endDate?: Date): { dateStr: string; label: string }[] {
-  let start = startDate
-  let end = endDate
+function toDateStr(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
 
-  if (!start || !end) {
-    const today = new Date()
-    const y = today.getFullYear()
-    const m = today.getMonth() + 1
-    const endMonth = m
-    const endYear = y
-    const startMonth = m - 1 <= 0 ? 12 : m - 1
-    const startYear = m - 1 <= 0 ? y - 1 : y
+// "YYYY-MM-DD" をローカル日付として読む（new Date("YYYY-MM-DD") はUTC扱いになるため）
+function parseDateStr(s: string): Date {
+  const [y, m, d] = s.split('-').map(Number)
+  return new Date(y, m - 1, d)
+}
 
-    start = new Date(startYear, startMonth - 1, 21)
-    end = new Date(endYear, endMonth - 1, 20)
-  }
+function addDays(s: string, days: number): string {
+  const d = parseDateStr(s)
+  d.setDate(d.getDate() + days)
+  return toDateStr(d)
+}
 
+function getPeriodDates(startDate: string, endDate: string): { dateStr: string; label: string }[] {
   const dates: { dateStr: string; label: string }[] = []
-  let d = new Date(start)
-  while (d <= end) {
-    const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-    const label = `${d.getMonth() + 1}/${d.getDate()}(${DAYS_JA[d.getDay()]})`
-    dates.push({ dateStr, label })
-    d = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1)
+  const end = parseDateStr(endDate)
+  for (let d = parseDateStr(startDate); d <= end; d = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1)) {
+    dates.push({ dateStr: toDateStr(d), label: `${d.getMonth() + 1}/${d.getDate()}(${DAYS_JA[d.getDay()]})` })
   }
   return dates
 }
 
-function initRecords(periodDates?: { dateStr: string; label: string }[]): WorkRecord[] {
-  const dates = periodDates || getPeriodDates()
-  return dates.map(({ dateStr }) => ({
-    date: dateStr,
-    clockIn: '',
-    clockOut: '',
-    breakStart: '',
-    breakEnd: '',
-  }))
+function emptyRecord(date: string): WorkRecord {
+  return { date, clockIn: '', clockOut: '', breakStart: '', breakEnd: '' }
+}
+
+// 旧版は画面の日付より1日後の日付で保存していた。画面で見えていた日付に付け直す。
+// 旧版の初期データは21日始まりなので、それで旧形式かどうかを見分ける。
+function migrateFromV1(data: Record<string, StaffData>): Record<string, StaffData> {
+  const out: Record<string, StaffData> = {}
+  for (const [name, sd] of Object.entries(data)) {
+    const records = sd?.records ?? []
+    const shifted = records.length > 0 && records[0].date.endsWith('-21')
+    out[name] = {
+      transportFee: sd?.transportFee ?? 0,
+      records: shifted ? records.map((r) => ({ ...r, date: addDays(r.date, -1) })) : records,
+    }
+  }
+  return out
 }
 
 export default function AdminPage() {
@@ -58,20 +66,10 @@ export default function AdminPage() {
   const [endDate, setEndDate] = useState<string>('')
 
   useEffect(() => {
-    // デフォルト日付を計算（前月21日～当月20日）
+    // デフォルト期間：前月21日～当月20日
     const today = new Date()
-    const y = today.getFullYear()
-    const m = today.getMonth() + 1
-    const endMonth = m
-    const endYear = y
-    const startMonth = m - 1 <= 0 ? 12 : m - 1
-    const startYear = m - 1 <= 0 ? y - 1 : y
-
-    const defaultStart = new Date(startYear, startMonth - 1, 21)
-    const defaultEnd = new Date(endYear, endMonth - 1, 20)
-
-    setStartDate(defaultStart.toISOString().split('T')[0])
-    setEndDate(defaultEnd.toISOString().split('T')[0])
+    setStartDate(toDateStr(new Date(today.getFullYear(), today.getMonth() - 1, 21)))
+    setEndDate(toDateStr(new Date(today.getFullYear(), today.getMonth(), 20)))
   }, [])
 
   useEffect(() => {
@@ -81,25 +79,25 @@ export default function AdminPage() {
         const list = Array.isArray(data) ? data : []
         setStaff(list)
         if (list.length > 0) setSelectedStaff(list[0].name)
-        const initial: Record<string, StaffData> = {}
-        list.forEach((s) => {
-          initial[s.name] = { records: initRecords(), transportFee: 0 }
-        })
-        // ローカルストレージから復元を試みる
-        if (typeof window !== 'undefined') {
-          const saved = localStorage.getItem('payrollData')
+
+        let restored: Record<string, StaffData> = {}
+        try {
+          const saved = localStorage.getItem(STORAGE_KEY)
           if (saved) {
-            try {
-              setStaffData(JSON.parse(saved))
-            } catch {
-              setStaffData(initial)
+            restored = JSON.parse(saved)
+            if (localStorage.getItem(STORAGE_VERSION_KEY) !== STORAGE_VERSION) {
+              localStorage.setItem(`${STORAGE_KEY}_backup_v1`, saved)
+              restored = migrateFromV1(restored)
             }
-          } else {
-            setStaffData(initial)
           }
-        } else {
-          setStaffData(initial)
+          localStorage.setItem(STORAGE_VERSION_KEY, STORAGE_VERSION)
+        } catch (err) {
+          console.error('Failed to restore payroll data:', err)
         }
+        list.forEach((s) => {
+          if (!restored[s.name]) restored[s.name] = { records: [], transportFee: 0 }
+        })
+        setStaffData(restored)
       })
       .catch((err) => {
         console.error('Failed to fetch staff:', err)
@@ -107,44 +105,35 @@ export default function AdminPage() {
       })
   }, [])
 
-  // ローカルストレージに自動保存
   useEffect(() => {
-    if (typeof window !== 'undefined' && Object.keys(staffData).length > 0) {
-      localStorage.setItem('payrollData', JSON.stringify(staffData))
+    if (Object.keys(staffData).length === 0) return
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(staffData))
+    } catch (err) {
+      console.error('Failed to save payroll data:', err)
     }
   }, [staffData])
 
-  const periodDates = startDate && endDate ? getPeriodDates(new Date(startDate), new Date(endDate)) : []
-  const currentData = staffData[selectedStaff] ?? { records: initRecords(periodDates), transportFee: 0 }
+  const periodDates = startDate && endDate ? getPeriodDates(startDate, endDate) : []
 
-  // 期間が変更された場合、既存のレコードをマージ
-  useEffect(() => {
-    if (selectedStaff && staffData[selectedStaff] && periodDates.length > 0) {
-      const existing = staffData[selectedStaff].records
-      if (existing.length !== periodDates.length) {
-        // 既存データを新しい期間に対応する配列に再構築
-        const mergedRecords = periodDates.map(({ dateStr }) => {
-          const existingRecord = existing.find(r => r.date === dateStr)
-          return existingRecord ?? { date: dateStr, clockIn: '', clockOut: '', breakStart: '', breakEnd: '' }
-        })
-        setStaffData(prev => ({
-          ...prev,
-          [selectedStaff]: { ...prev[selectedStaff], records: mergedRecords }
-        }))
-      }
-    }
-  }, [startDate, endDate, selectedStaff, periodDates.length])
+  const recordsInPeriod = (records: WorkRecord[]): WorkRecord[] =>
+    periodDates.map(({ dateStr }) => records.find((r) => r.date === dateStr) ?? emptyRecord(dateStr))
+
+  const currentData = staffData[selectedStaff] ?? { records: [], transportFee: 0 }
+  const rows = recordsInPeriod(currentData.records)
 
   const updateRecord = useCallback(
-    (idx: number, field: keyof WorkRecord, value: string) => {
+    (date: string, field: keyof WorkRecord, value: string) => {
       setStaffData((prev) => {
-        const data = prev[selectedStaff] ?? { records: initRecords(periodDates), transportFee: 0 }
-        const records = [...data.records]
-        records[idx] = { ...records[idx], [field]: value }
+        const data = prev[selectedStaff] ?? { records: [], transportFee: 0 }
+        const exists = data.records.some((r) => r.date === date)
+        const records = exists
+          ? data.records.map((r) => (r.date === date ? { ...r, [field]: value } : r))
+          : [...data.records, { ...emptyRecord(date), [field]: value }]
         return { ...prev, [selectedStaff]: { ...data, records } }
       })
     },
-    [selectedStaff, periodDates]
+    [selectedStaff]
   )
 
   const updateTransport = useCallback(
@@ -157,12 +146,13 @@ export default function AdminPage() {
     [selectedStaff]
   )
 
-  const result = calcSalary(selectedStaff, currentData.records, currentData.transportFee)
+  const result = calcSalary(selectedStaff, rows, currentData.transportFee)
 
   const handleDownload = () => {
     const staffList: StaffSalaryJson[] = staff.map((s) => {
       const data = staffData[s.name] ?? { records: [], transportFee: 0 }
-      const r = calcSalary(s.name, data.records, data.transportFee)
+      const periodRecords = recordsInPeriod(data.records)
+      const r = calcSalary(s.name, periodRecords, data.transportFee)
       return {
         name: s.name,
         workDays: r.workDays,
@@ -175,7 +165,7 @@ export default function AdminPage() {
         incomeTax: r.incomeTax,
         employmentInsurance: r.employmentInsurance,
         netPay: r.netPay,
-        records: data.records,
+        records: periodRecords,
       }
     })
 
@@ -271,17 +261,17 @@ export default function AdminPage() {
                 </tr>
               </thead>
               <tbody>
-                {currentData.records.map((record, idx) => (
+                {rows.map((record, idx) => (
                   <tr key={record.date} className="border-b hover:bg-gray-50">
                     <td className="px-4 py-2">
-                      <span>{periodDates[idx]?.label || ''}</span>
+                      <span>{periodDates[idx].label}</span>
                       {isHoliday(record.date) && <span className="text-red-500 ml-1 font-semibold">祝</span>}
                     </td>
                     <td className="px-4 py-2">
                       <input
                         type="time"
                         value={record.clockIn}
-                        onChange={(e) => updateRecord(idx, 'clockIn', e.target.value)}
+                        onChange={(e) => updateRecord(record.date, 'clockIn', e.target.value)}
                         className="w-20 px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                       />
                     </td>
@@ -289,7 +279,7 @@ export default function AdminPage() {
                       <input
                         type="time"
                         value={record.breakStart}
-                        onChange={(e) => updateRecord(idx, 'breakStart', e.target.value)}
+                        onChange={(e) => updateRecord(record.date, 'breakStart', e.target.value)}
                         className="w-20 px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                       />
                     </td>
@@ -297,7 +287,7 @@ export default function AdminPage() {
                       <input
                         type="time"
                         value={record.breakEnd}
-                        onChange={(e) => updateRecord(idx, 'breakEnd', e.target.value)}
+                        onChange={(e) => updateRecord(record.date, 'breakEnd', e.target.value)}
                         className="w-20 px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                       />
                     </td>
@@ -305,7 +295,7 @@ export default function AdminPage() {
                       <input
                         type="time"
                         value={record.clockOut}
-                        onChange={(e) => updateRecord(idx, 'clockOut', e.target.value)}
+                        onChange={(e) => updateRecord(record.date, 'clockOut', e.target.value)}
                         className="w-20 px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                       />
                     </td>
