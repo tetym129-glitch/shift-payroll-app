@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import { getSettings, updateSettings } from '@/lib/notion'
 
+export const dynamic = 'force-dynamic'
+
 export async function GET() {
   try {
     return NextResponse.json(await getSettings())
