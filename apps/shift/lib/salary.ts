@@ -21,16 +21,19 @@ export interface SalaryResult {
   netPay: number
 }
 
-// 時給テーブル
-// 平日: 全員 1,053円（福井市最低賃金）
-// 土日祝: 通常 1,200円 / 研修中（小川・山下・本田）1,150円
+// 時給テーブル（概算人件費用。給料計算アプリと同じ値）
+// 平日: 1,112円（福井県最低賃金・2026/9/21〜）。坂井・山田は1,200円
+// 土日祝: 通常 1,200円 / 研修中（石川・山本・山下・藤森・鈴木）1,150円
 const HOURLY_RATES: Record<string, { weekday: number; holiday: number }> = {
-  '坂井': { weekday: 1153, holiday: 1300 },   // 特別レート
-  '小川': { weekday: 1053, holiday: 1150 },   // 研修中
-  '山下': { weekday: 1053, holiday: 1150 },   // 研修中
-  '本田': { weekday: 1053, holiday: 1150 },   // 研修中
+  '坂井': { weekday: 1200, holiday: 1300 },
+  '山田': { weekday: 1200, holiday: 1300 },
+  '山下': { weekday: 1112, holiday: 1150 },
+  '石川': { weekday: 1112, holiday: 1150 },
+  '山本': { weekday: 1112, holiday: 1150 },
+  '藤森': { weekday: 1112, holiday: 1150 },
+  '鈴木': { weekday: 1112, holiday: 1150 },
 }
-const DEFAULT_RATE = { weekday: 1053, holiday: 1200 }
+const DEFAULT_RATE = { weekday: 1112, holiday: 1200 }
 
 export function getHourlyRate(name: string) {
   return HOURLY_RATES[name] ?? DEFAULT_RATE
