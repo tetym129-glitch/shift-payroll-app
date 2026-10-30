@@ -23,7 +23,7 @@ export interface SalaryResult {
 
 // 時給テーブル
 // 平日: 1,112円（福井県最低賃金・2026/9/21〜）。坂井・山田は1,200円
-// 土日祝: 通常 1,200円 / 研修中（石川・山本・山下・藤森・鈴木）1,150円
+// 土日祝: 通常 1,200円 / 研修中（石川・山本・山下・鈴木）1,150円
 const HOURLY_RATES: Record<string, { weekday: number; holiday: number }> = {
   '坂井': { weekday: 1200, holiday: 1300 },     // 特別レート
   '山田': { weekday: 1200, holiday: 1300 },
@@ -34,7 +34,7 @@ const HOURLY_RATES: Record<string, { weekday: number; holiday: number }> = {
   '石川': { weekday: 1112, holiday: 1150 },     // 研修中
   '山本': { weekday: 1112, holiday: 1150 },     // 研修中
   '古川': { weekday: 1112, holiday: 1200 },     // 通常
-  '藤森': { weekday: 1112, holiday: 1150 },     // 研修中
+  '藤森': { weekday: 1112, holiday: 1200 },     // 研修外れ
   '鈴木': { weekday: 1112, holiday: 1150 },     // 研修中
 }
 const DEFAULT_RATE = { weekday: 1112, holiday: 1200 }
