@@ -18,7 +18,23 @@ export default function MeisaiPage() {
   const [pinError, setPinError] = useState('')
   const [slips, setSlips] = useState<Slip[] | null>(null)
   const [viewer, setViewer] = useState<Slip | null>(null)
+  const [notice, setNotice] = useState('')
   const pinRef = useRef<HTMLInputElement>(null)
+
+  // LINEの中のブラウザは保存ができないことが多いので、スマホの普通のブラウザ（Safari/Chrome）で開き直す
+  useEffect(() => {
+    const url = new URL(window.location.href)
+    if (/ Line\//i.test(navigator.userAgent) && url.searchParams.get('openExternalBrowser') !== '1') {
+      url.searchParams.set('openExternalBrowser', '1')
+      window.location.replace(url.toString())
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!notice) return
+    const t = setTimeout(() => setNotice(''), 9000)
+    return () => clearTimeout(t)
+  }, [notice])
 
   useEffect(() => {
     fetch('/api/meisai/staff', { cache: 'no-store' })
@@ -43,6 +59,7 @@ export default function MeisaiPage() {
 
   const back = () => {
     setViewer(null)
+    setNotice('')
     setName(null)
     setPin('')
     setPinError('')
@@ -93,18 +110,43 @@ export default function MeisaiPage() {
     }
   }
 
-  // iPhoneは「押したその場」で共有メニューを出さないと何も起きないので、待ち時間を入れずに呼ぶ
+  // 機種ごとに保存のしかたを変える
+  // - iPhone/iPad：共有メニューの「画像を保存」で写真に入る。「押したその場」で呼ばないと何も起きないので待ち時間を入れない
+  // - Android：共有メニューに「保存」がないので、サーバーから「ダウンロード」として受け取る（ギャラリー/ファイルのDownloadに入る）
+  // - Mac/パソコン：そのままダウンロード
   const save = (s: Slip) => {
-    if (!s.url || !s.file) return
-    const isPhone = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || navigator.maxTouchPoints > 1
-    if (isPhone && navigator.canShare?.({ files: [s.file] })) {
-      navigator.share({ files: [s.file] }).catch(e => {
-        if ((e as Error).name !== 'AbortError') setViewer(s)
-      })
+    if (!s.url || !s.file || !name) return
+    const ua = navigator.userAgent
+    const isAndroid = /Android/i.test(ua)
+    const isIOS = /iPhone|iPad|iPod/i.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1)
+    if (isIOS) {
+      if (navigator.canShare?.({ files: [s.file] })) {
+        navigator.share({ files: [s.file] }).catch(e => {
+          if ((e as Error).name !== 'AbortError') setViewer(s)
+        })
+      } else {
+        setViewer(s) // 共有できないときは、大きく出して長押しで保存してもらう
+      }
       return
     }
-    if (isPhone) {
-      setViewer(s) // 共有できない機種は、大きく出して長押しで保存してもらう
+    if (isAndroid) {
+      // 画面の外に小さなフォームを作って送る（ブラウザが普通のダウンロードとして受け取る）
+      const form = document.createElement('form')
+      form.method = 'POST'
+      form.action = '/api/meisai/image'
+      form.style.display = 'none'
+      const fields: Record<string, string> = { name, pin, month: s.month, download: '1' }
+      for (const [k, v] of Object.entries(fields)) {
+        const input = document.createElement('input')
+        input.type = 'hidden'
+        input.name = k
+        input.value = v
+        form.appendChild(input)
+      }
+      document.body.appendChild(form)
+      form.submit()
+      form.remove()
+      setNotice('ダウンロードしました。「ファイル」や「ギャラリー（フォト）」のダウンロードに入っています。見つからないときは、画像を長押しして「画像をダウンロード」を押してください')
       return
     }
     const a = document.createElement('a')
@@ -219,6 +261,11 @@ export default function MeisaiPage() {
         ))}
       </div>
       <p className="mt-8 text-center text-xs text-stone-500">画像を長押ししても保存できます</p>
+      {notice && (
+        <div className="fixed inset-x-3 bottom-4 z-40 rounded-2xl bg-stone-800 p-4 text-sm leading-relaxed text-white shadow-lg" onClick={() => setNotice('')}>
+          {notice}
+        </div>
+      )}
       {viewer?.url && (
         <div className="fixed inset-0 z-50 flex flex-col bg-black/90" onClick={() => setViewer(null)}>
           <p className="px-4 pt-6 text-center text-sm text-white">画像を<b>長押し</b>して「写真に保存」を押してください</p>
