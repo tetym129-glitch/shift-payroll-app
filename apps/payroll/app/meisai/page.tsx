@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 
-type Slip = { month: string; url: string | null; error?: string }
+type Slip = { month: string; url: string | null; file?: File; error?: string }
 
 const monthLabel = (m: string) => {
   const [y, mo] = m.split('-')
@@ -17,6 +17,7 @@ export default function MeisaiPage() {
   const [checking, setChecking] = useState(false)
   const [pinError, setPinError] = useState('')
   const [slips, setSlips] = useState<Slip[] | null>(null)
+  const [viewer, setViewer] = useState<Slip | null>(null)
   const pinRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -41,6 +42,7 @@ export default function MeisaiPage() {
   }
 
   const back = () => {
+    setViewer(null)
     setName(null)
     setPin('')
     setPinError('')
@@ -74,8 +76,11 @@ export default function MeisaiPage() {
             body: JSON.stringify({ name, pin: value, month: m }),
           })
           if (!r.ok) throw new Error()
-          const url = URL.createObjectURL(await r.blob())
-          setSlips(prev => prev?.map(s => (s.month === m ? { ...s, url } : s)) ?? prev)
+          const blob = await r.blob()
+          const url = URL.createObjectURL(blob)
+          // 保存ボタンを押したその場で共有メニューを出せるよう、先にファイルにしておく
+          const file = new File([blob], `給与明細_${m}_${name}.png`, { type: 'image/png' })
+          setSlips(prev => prev?.map(s => (s.month === m ? { ...s, url, file } : s)) ?? prev)
         } catch {
           setSlips(prev => prev?.map(s => (s.month === m ? { ...s, error: '読み込めませんでした' } : s)) ?? prev)
         }
@@ -88,24 +93,26 @@ export default function MeisaiPage() {
     }
   }
 
-  const save = async (s: Slip) => {
-    if (!s.url || !name) return
-    const filename = `給与明細_${s.month}_${name}.png`
-    const blob = await (await fetch(s.url)).blob()
-    const file = new File([blob], filename, { type: 'image/png' })
-    // スマホは共有メニューから「画像を保存」できる
-    if (navigator.canShare?.({ files: [file] })) {
-      try {
-        await navigator.share({ files: [file] })
-        return
-      } catch (e) {
-        if ((e as Error).name === 'AbortError') return
-      }
+  // iPhoneは「押したその場」で共有メニューを出さないと何も起きないので、待ち時間を入れずに呼ぶ
+  const save = (s: Slip) => {
+    if (!s.url || !s.file) return
+    const isPhone = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || navigator.maxTouchPoints > 1
+    if (isPhone && navigator.canShare?.({ files: [s.file] })) {
+      navigator.share({ files: [s.file] }).catch(e => {
+        if ((e as Error).name !== 'AbortError') setViewer(s)
+      })
+      return
+    }
+    if (isPhone) {
+      setViewer(s) // 共有できない機種は、大きく出して長押しで保存してもらう
+      return
     }
     const a = document.createElement('a')
     a.href = s.url
-    a.download = filename
+    a.download = s.file.name
+    document.body.appendChild(a)
     a.click()
+    a.remove()
   }
 
   // ---- 画面 ----
@@ -194,7 +201,7 @@ export default function MeisaiPage() {
               <h2 className="font-semibold">{monthLabel(s.month)}</h2>
               <button
                 onClick={() => save(s)}
-                disabled={!s.url}
+                disabled={!s.file}
                 className="rounded-full bg-stone-800 px-4 py-2 text-sm font-semibold text-white disabled:opacity-40 active:scale-[0.97]"
               >
                 画像を保存
@@ -212,6 +219,14 @@ export default function MeisaiPage() {
         ))}
       </div>
       <p className="mt-8 text-center text-xs text-stone-500">画像を長押ししても保存できます</p>
+      {viewer?.url && (
+        <div className="fixed inset-0 z-50 flex flex-col bg-black/90" onClick={() => setViewer(null)}>
+          <p className="px-4 pt-6 text-center text-sm text-white">画像を<b>長押し</b>して「写真に保存」を押してください</p>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={viewer.url} alt="給与明細" className="mx-auto mt-4 max-h-[78vh] w-auto max-w-full bg-white" onClick={e => e.stopPropagation()} />
+          <button className="mx-auto mt-4 rounded-full bg-white px-6 py-2 text-sm font-semibold">とじる</button>
+        </div>
+      )}
     </main>
   )
 }
